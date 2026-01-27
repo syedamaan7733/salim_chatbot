@@ -1,0 +1,8 @@
+flask
+gunicorn
+python-dotenv
+psycopg2-binary
+Flask-Caching
+apscheduler
+requests
+PyJWT
