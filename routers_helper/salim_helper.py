@@ -37,24 +37,21 @@ def send_whatsapp_message(mobile, message_payload):
         return
 
     headers = {
-        "Authorization": f"Bearer {get_token()}",
+        "Authorization": "Bearer EAAVx6tYG5Q8BQFyxJO8DDxqZBWEC43ZCAFTnHXDyB5UMc4Vsjvse57MDtlIdZCuuSPy8N4SGOOsZBm9Fa3gxkBVfGiCkhypA9Srr1EwnJkEgS0IextKUt2OloZAQoJyaIAL9UwgP5ZBO9izA6XaiFKreGsKBrGd1Wte9y61XLZCSm4c8KpEvAv92zI3nechIAZDZD",
         "Content-Type": "application/json",
         "User-Agent": "insomnia/10.0.0"
     }
     
-    # Construct the full payload required by the provider/API
+    # Construct the full payload required by Meta Cloud API
+    # The payload must include 'messaging_product' and 'recipient_type'
     full_payload = {
-        "messages": [
-            {
-                "sender": os.getenv('WHATSAPP_BOT_NUMBER'),
-                "to": mobile,
-                "channel": "wa", 
-                # Merge the specific message content
-                **message_payload 
-            }
-        ],
-        "responseType": "json"
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": mobile,
     }
+    
+    # Merge the specific message content (e.g., {'type': 'text', 'text': {...}})
+    full_payload.update(message_payload)
     
     try:
         response = requests.post(url, json=full_payload, headers=headers)
@@ -91,30 +88,30 @@ def get_category_list_message():
         }
 
     return {
-        "type": "interactive",
-        "interactive": {
-            "type": "list",
-            "header": {
-                "type": "text",
-                "text": "Salim Footwear"
-            },
-            "body": {
-                "text": "Welcome! Please select a category to view products:"
-            },
-            "footer": {
-                "text": "Select from the list below"
-            },
-            "action": {
-                "button": "View Categories",
-                "sections": [
-                    {
-                        "title": "Collections",
-                        "rows": rows
-                    }
-                ]
-            }
+    "type": "interactive",
+    "interactive": {
+        "type": "list",
+        "header": {
+            "type": "text",
+            "text": "सलीम फुटवियर"
+        },
+        "body": {
+            "text": "स्वागत है! कृपया उत्पाद देखने के लिए एक श्रेणी चुनें:"
+        },
+        "footer": {
+            "text": "नीचे दी गई सूची से चुनें"
+        },
+        "action": {
+            "button": "श्रेणियाँ देखें",
+            "sections": [
+                {
+                    "title": "कलेक्शन",
+                    "rows": rows
+                }
+            ]
         }
     }
+}
 
 def get_link_message(category_name):
     """
