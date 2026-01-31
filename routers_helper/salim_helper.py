@@ -37,7 +37,7 @@ def send_whatsapp_message(mobile, message_payload):
         return
 
     headers = {
-        "Authorization": "Bearer EAAVx6tYG5Q8BQFyxJO8DDxqZBWEC43ZCAFTnHXDyB5UMc4Vsjvse57MDtlIdZCuuSPy8N4SGOOsZBm9Fa3gxkBVfGiCkhypA9Srr1EwnJkEgS0IextKUt2OloZAQoJyaIAL9UwgP5ZBO9izA6XaiFKreGsKBrGd1Wte9y61XLZCSm4c8KpEvAv92zI3nechIAZDZD",
+        "Authorization": "Bearer EAAQyxuMGj6oBQn6mZAuR8nzBIpDhW5xOwInSgw5BePeTgZCCP6xjXVPq0a5I9wCOGGDGfZALr6bQsil43cPauoybuAmGHOL2s4YPCn9MLWUgKyZBWvo7VjEhqwYgaWtlKwK1ZABiXS6SBXLJTUhTynWxaCHKaQkqrDKdGv1VBdY1o7rM2DIyokZB7bSDnHMPBSPQZDZD",
         "Content-Type": "application/json",
         "User-Agent": "insomnia/10.0.0"
     }
@@ -117,19 +117,22 @@ def get_link_message(category_name):
     """
     Generates the Text Message payload with the redirect link.
     """
-    # Construct redirect link
     PRODUCTS_REDIRECT_BASE_URL = os.getenv('PRODUCTS_REDIRECT_BASE_URL')
-    # Using quote to handle spaces and special chars in category name
+
+    # Encode category safely
     encoded_category = requests.utils.quote(category_name)
-    link = f"{PRODUCTS_REDIRECT_BASE_URL}?category={encoded_category}"
-    
+    link = f"{PRODUCTS_REDIRECT_BASE_URL}category={encoded_category}"
+
+    print(link)
+
     return {
         "type": "text",
         "text": {
-            "content": f"Click the link below to view *{category_name}* collection:\n\n{link}",
+            "body": f"Click the link below to view *{category_name}* collection:\n\n{link}",
             "preview_url": True
         }
     }
+
 
 def process_incoming_message(data):
     """
