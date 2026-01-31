@@ -10,22 +10,38 @@ load_dotenv()
 # Redirect Base URL (Generic placeholder, can be updated)
 PRODUCTS_REDIRECT_BASE_URL = os.getenv('PRODUCTS_REDIRECT_BASE_URL')
 
-def fetch_categories():
+def fetch_categories(page=1, limit=10):
     CATEGORY_API_URL = os.getenv('CATEGORY_API_URL')
     """
-    Fetches categories from the external API.
-    Returns a list of category objects.
+    Fetches categories from the external API with pagination.
+    Returns the full response object matching the new API structure:
+    {
+        "categories": [...],
+        "meta": { "total": 20, "page": 1, "limit": 10, "totalPages": 2 }
+    }
     """
     try:
-        print("CATEGORY_API_URL",CATEGORY_API_URL)
-        response = requests.get(CATEGORY_API_URL)
+        # Construct URL with query parameters
+        # Assumes CATEGORY_API_URL does not already have query params
+        url = f"{CATEGORY_API_URL}?page={page}&limit={limit}"
+        print("Fetching URL:", url)
+        
+        response = requests.get(url)
         if response.status_code == 200:
             data = response.json()
+            # New structure detection
+            # If the API returns the structure directly
+            if "categories" in data and "meta" in data:
+                return data
+            
+            # Fallback for old structure if needed (optional, keeping safe)
             if data.get("success"):
-                return data.get("data", [])
+                return {"categories": data.get("data", []), "meta": {}}
+                
     except Exception as e:
         print(f"Error fetching categories: {e}")
-    return []
+    
+    return {"categories": [], "meta": {}}
 
 def send_whatsapp_message(mobile, message_payload):
     """
@@ -61,24 +77,45 @@ def send_whatsapp_message(mobile, message_payload):
     except Exception as e:
         print(f"Error sending message: {e}")
 
-def get_category_list_message():
+def get_category_list_message(page=1):
     """
-    Generates the WhatsApp Interactive List Message payload.
+    Generates the WhatsApp Interactive List Message payload with pagination.
     """
-    categories = fetch_categories()
+    # We fetch 9 items to fit 9 categories + 1 'More' button = 10 rows (WhatsApp Limit).
+    data = fetch_categories(page=page, limit=9)
+    categories = data.get("categories", [])
+    meta = data.get("meta", {})
     
-    # WhatsApp Limit: Max 10 rows in a section
-    valid_categories = categories[:10]
+    total_pages = meta.get("totalPages", 1)
+    current_page = meta.get("page", 1)
     
     rows = []
-    for cat in valid_categories:
-        cat_name = cat.get("category", "Unknown")
+    
+    # Logic: If we are not on the last page, we need to reserve one slot for "More"
+    has_next_page = current_page < total_pages
+    
+    # Determine categories to display (Max 9)
+    display_categories = categories[:9]
+    
+    for cat in display_categories:
+        # Adapt to key names in new API (name, imageUrl) vs old (category)
+        cat_name = cat.get("name") or cat.get("category", "Unknown")
+        
         # Title limit is 24 chars
         title = cat_name[:24]
         rows.append({
             "id": cat_name,       # We'll use the name as ID to identify selection
             "title": title,
             "description": ""     # description is optional
+        })
+    
+    # Add 'More' button if needed
+    if has_next_page:
+        next_page = current_page + 1
+        rows.append({
+            "id": f"KEY3_p_{next_page}",
+            "title": "More...",
+            "description": f"Page {current_page}/{total_pages}"
         })
         
     if not rows:
@@ -96,7 +133,7 @@ def get_category_list_message():
             "text": "सलीम फुटवियर"
         },
         "body": {
-            "text": "स्वागत है! कृपया उत्पाद देखने के लिए एक श्रेणी चुनें:"
+            "text": f"स्वागत है! कृपया उत्पाद देखने के लिए एक श्रेणी चुनें (Page {current_page}/{total_pages}):"
         },
         "footer": {
             "text": "नीचे दी गई सूची से चुनें"
@@ -121,7 +158,7 @@ def get_link_message(category_name):
 
     # Encode category safely
     encoded_category = requests.utils.quote(category_name)
-    link = f"{PRODUCTS_REDIRECT_BASE_URL}category={encoded_category}"
+    link = f"{PRODUCTS_REDIRECT_BASE_URL}?category={encoded_category}"
 
     print(link)
 
@@ -177,7 +214,6 @@ def process_incoming_message(data):
 
         message_type = message_data.get("type")
         
-        # Check if it's an interactive reply (User selected a list option or button)
         if message_type == "interactive":
             interactive = message_data.get("interactive", {})
             selection_id = None
@@ -188,15 +224,31 @@ def process_incoming_message(data):
                  selection_id = interactive.get("button_reply", {}).get("id")
             
             if selection_id:
+                # Check for Pagination Key
+                if selection_id.startswith("KEY3_p_"):
+                    try:
+                        page_str = selection_id.split("_p_")[1]
+                        page = int(page_str)
+                        print(f"User requested page {page}")
+                        response_payload = get_category_list_message(page=page)
+                        send_whatsapp_message(mobile, response_payload)
+                        return
+                    except Exception as e:
+                        print(f"Error parsing page number: {e}")
+                        # Fallback to page 1 in error case
+                        response_payload = get_category_list_message(page=1)
+                        send_whatsapp_message(mobile, response_payload)
+                        return
+                    
                 print(f"User {mobile} selected category: {selection_id}")
                 response_payload = get_link_message(selection_id)
                 send_whatsapp_message(mobile, response_payload)
                 return
 
-        # Default action: Send Category List
+        # Default action: Send Category List (Page 1)
         # This covers "text", "image", etc. - basically "Hi" or any other trigger
         print(f"Received message from {mobile}, sending category list.")
-        response_payload = get_category_list_message()
+        response_payload = get_category_list_message(page=1)
         print(response_payload)
         send_whatsapp_message(mobile, response_payload)
         
